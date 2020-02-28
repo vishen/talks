@@ -1,0 +1,55 @@
+Learning Go
+
+Jonathan Pentecost
+
+* Basic Types
+
+- bool
+- string
+- int, int8, int16, int32, int64
+- uint, uint8, uint16, uint32, uint64
+- byte // alias for uint8
+- rune // alias for uint32
+- float32, float64
+
+Note: int, uint are usually 32 bits wide on a 32 bit-system and 64 bits wide on a 64-bit system.
+
+* Declaring and Assigning Variables
+.play variables.go  /^func main/,/^}/
+
+* Variable Type Inference
+.play variables_type_inference.go  /^func main/,/^}/
+
+* Arrays
+.play arrays.go  /^func main/,/^}/
+
+* Slices
+.play slices.go  /^func main/,/^}/
+
+* Slices: Length and Capacity
+
+A slice has both a _length_ and a _capacity_. The length of a slice is the number of elements it contains.
+
+The capacity of a slice is the number of elements in the underlying array (counting from the first element in the slice).
+
+.play slices_length_and_capacity.go  /^func main/,/^}/
+
+* Slices: Make
+
+Slices can be created with the built-in `make`. The `make` function allocates a zeroed array and returns a slice that refers to it.
+
+.play slices_make.go  /^func main/,/^}/
+
+* Slices: Append
+
+It is common to append elements to a slice. `append` is a built-in function that will dynamically add an element to an array. 
+
+If the backing array of the slice is too small to fit the appended element, a bigger array will be allocated.
+
+.play slices_append.go  /^func main/,/^}/
+
+* Strings
+.play strings.go  /^func main/,/^}/
+
+* Maps
+.play maps.go  /^func main/,/^}/
