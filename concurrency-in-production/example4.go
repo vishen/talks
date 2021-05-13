@@ -16,6 +16,8 @@ func inc(num int) {
 
 func main() {
 	wg := sync.WaitGroup{}
+
+	// Should match the number of goroutines being spawned
 	wg.Add(1)
 
 	go func() {

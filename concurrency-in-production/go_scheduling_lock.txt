@@ -2,19 +2,21 @@ Go Runtime          | Goroutine 1           | Goroutine 2
                      lock()
                      mov   eax, 12345
                      add   eax, 1
-                     mov 12345, eax
-                     unlock()
 interrupt:
 save G1's state
 restore G2's state
-											 lock()
-                                             mov   eax, 12345
-                                             add   eax, 1
-                                             mov   12345, eax
-                                             unlock()
+                                             lock()
+                                             can't acquire lock
+                                             sleeps
 interrupt:
 save G2's state
 restore G1's state
                     
-                     
+                     mov 12345, eax
+                     unlock()
+                                             lock()
+                                             mov   eax, 12345
+                                             add   eax, 1
+                                             mov   12345, eax
+                                             unlock()
 

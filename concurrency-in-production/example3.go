@@ -17,7 +17,7 @@ func inc(num int) {
 func main() {
 	go inc(1000)
 	fmt.Println(count)
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 	fmt.Println(count)
 }
 

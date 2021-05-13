@@ -4,15 +4,15 @@ import (
 	"fmt"
 )
 
-var i int
+var count int
 
 func inc() {
-	i += 1
+	count += 1
 }
 
 func main() {
 	for i := 0; i < 1000; i++ {
 		inc()
 	}
-	fmt.Println(i)
+	fmt.Println(count)
 }

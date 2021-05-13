@@ -1,8 +1,8 @@
-Concurrency with Go in Production
+# Concurrency with Go in Production
 
 Jonathan Pentecost
 
-* Simple example
+## Simple example in C
 
 .code example1.c
 
@@ -11,62 +11,70 @@ Jonathan Pentecost
 	main: counter=0
 	main: counter=1
 
-* Crux of the problem: Part 1
+## Crux of the problem: Part 1
 
 What happens when we compile this down to assumbly?
+```
+$ objdump -D example1-c -x86-asm-syntax intel
 
-	$ objdump -D example1-c -x86-asm-syntax intel
+0000000100000f10 _inc:
+100000f10: 55                          	push	rbp
+100000f11: 48 89 e5                    	mov	rbp, rsp
+100000f14: 8b 05 f6 10 00 00           	mov	eax, dword ptr [rip + 4342]
+100000f1a: 83 c0 01                    	add	eax, 1
+100000f1d: 89 05 ed 10 00 00           	mov	dword ptr [rip + 4333], eax
+100000f23: 5d                          	pop	rbp
+100000f24: c3                          	ret
+100000f25: 66 2e 0f 1f 84 00 00 00 00 00       	nop	word ptr cs:[rax + rax]
+100000f2f: 90                          	nop
+```
 
-	0000000100000f10 _inc:
-	100000f10: 55                          	push	rbp
-	100000f11: 48 89 e5                    	mov	rbp, rsp
-	100000f14: 8b 05 f6 10 00 00           	mov	eax, dword ptr [rip + 4342]
-	100000f1a: 83 c0 01                    	add	eax, 1
-	100000f1d: 89 05 ed 10 00 00           	mov	dword ptr [rip + 4333], eax
-	100000f23: 5d                          	pop	rbp
-	100000f24: c3                          	ret
-	100000f25: 66 2e 0f 1f 84 00 00 00 00 00       	nop	word ptr cs:[rax + rax]
-	100000f2f: 90                          	nop
-
-* Crux of the problem: Part 1
+## Crux of the problem: Part 1
 
 As we see the following single line of code:
 
-	counter = counter + 1 
+```
+counter = counter + 1 
+```
 
 gets compiled down to three instructions:
 
-	100000f14: 8b 05 f6 10 00 00           	mov	eax, dword ptr [rip + 4342]
-	100000f1a: 83 c0 01                    	add	eax, 1
-	100000f1d: 89 05 ed 10 00 00           	mov	dword ptr [rip + 4333], eax
+```
+100000f14: 8b 05 f6 10 00 00           	mov	eax, dword ptr [rip + 4342]
+100000f1a: 83 c0 01                    	add	eax, 1
+100000f1d: 89 05 ed 10 00 00           	mov	dword ptr [rip + 4333], eax
+```
 
-* Now to Go
+## Now to Go
 
 Lets recreate this example but in Go so we can all understand
 
 .play example1.go
 
 
-* Now lets add some concurrency
+## Now lets add some concurrency
 
 .play example2.go
 
-* Why didn't it work
+## Why didn't it work
 
 - Go starts up the main function
 - The main function calls a goroutine
 - The Goroutine gets added to the Go runtime scheduler
-- Main functions exits
+- Main function exits
+- Main function doesn't wait for the Go runtime scheduler to complete
 
 In this situation, the main function doesn't know that it needs to wait for the runtime scheduler to finish, so it exits.
 
-Quick fix, lets add a `time.Sleep`
+Quick fix:
 
-* time.Sleep to the rescue
+lets add a `time.Sleep`
+
+## time.Sleep to the rescue
 
 .play example3.go /START OMIT/,/END OMIT/
 
-* Why did this fix the issue
+## Why did this fix the issue
 
 - Go starts up the main function
 - The main function calls a goroutine
@@ -77,11 +85,11 @@ Quick fix, lets add a `time.Sleep`
 
 This fixed this issue, but using a time.Sleep isn't very reliable.
 
-* sync.WaitGroup to the rescue
+## sync.WaitGroup to the rescue
 
 .play example4.go /START OMIT/,/END OMIT/
 
-* What is sync.WaitGroup
+## What is sync.WaitGroup
 
 A WaitGroup waits for a collection of goroutines to finish. 
 
@@ -89,32 +97,37 @@ The main goroutine calls Add to set the number of goroutines to wait for. Then e
 
 At the same time, Wait can be used to block until all goroutines have finished.
 
-* Lets add in some concurrency
+## Lets add in some concurrency
 
 .play example5.go /START OMIT/,/END OMIT/
 
-* Crux of the problem: Part 1
+## Crux of the problem: Part 1
 
 Remember, the following line:
 
-	counter = counter + 1 
+```
+counter = counter + 1 
+```
 
-gets compiled down to three instructions and assume that memory location `12345` contains our counter variable:
+gets compiled down to three instructions (and assume that memory location `12345` contains our counter variable):
 
-	mov	eax, 12345
-	add	eax, 1
-	mov	12345, eax
+```
+mov	eax, 12345
+add	eax, 1
+mov	12345, eax
+```
 
-* Crux of the problem: Part 2
+## Crux of the problem: Part 2
 
-How an Operating System schedules threads?
+How an Operating System schedules processes / threads?
 
-- A thread will run code given to it by the OS
+- When an OS starts up, it takes control over all the CPUs
+- The OS will start running and scheduling processes and threads on CPUs
 - Threads share memory
 
 .code os_scheduling.txt
 
-* Crux of the problem: Part 4
+## Crux of the problem: Part 3
 
 In Go we don't control what threads our code is running on, but the Go Runtime Scheduler will utilise threads under-the-hood to manage and run our goroutines.
 
@@ -124,47 +137,51 @@ This isn't exactly how it works, but it is a useful way to think about it at a h
 
 .code go_scheduling.txt
 
-* Revisiting the issue
+## Revisiting the issue
 
 .play example5.go /START OMIT/,/END OMIT/
 
-* Let's add locking
+## Let's add locking
 
 .play example6.go /START OMIT/,/END OMIT/
 
-* Visualizing locking
+This works because each Goroutine will try and acquire the lock, but won't be able to until the lock has been released.
+
+In this way, only one of these functions can ever be running at a single time.
+
+## Visualizing locking
 
 .code go_scheduling_lock.txt
 
-* Other Go concurrency primitives: Channels
+## Other Go concurrency primitives: Channels
 
 Channels are the pipes that connect concurrent goroutines. 
 
 You can send values into channels from one goroutine and receive those values into another goroutine.
 
-* Buffered Channels: Part 1
+## Buffered Channels: Part 1
 
 .play -edit example7.go
 
-* Buffered Channels: Part 2
+## Buffered Channels: Part 2
 
 .play -edit example8.go
 
-* Unbuffered Channels
+## Unbuffered Channels
 
 .play -edit example9.go
 
-* Concurrency in Distributed System
+## Concurrency in Distributed System
 
 This is some code taken from one of our services (ordering-api). Does this pattern look familiar?
 
 - Read data from dynamo
-- Update data in memoru
+- Update data in memory
 - Write data to dynamo
 
 .code example10.go /START OMIT/,/END OMIT/
 
-* Scheduling in a Distributed System
+## Scheduling in a Distributed System
 
 This should look very similar to how threads and goroutines get scheduled.
 
@@ -174,10 +191,61 @@ If we aren't careful, multiple running pods updating data in this way will cause
 
 .code pod_scheduling.txt
 
-* Avoiding concurrency bugs in distributed systems
+## Avoiding concurrency bugs Dynamo
 
 There is two ways to avoid the concurrency bug:
 
-1. Sequencing: `go-kit` has sequencing built in to our projections. Projections with a sequencing tag will error if you try and update the projection with a previous version
+**Sequencing**
 
-2. Using `Patch`: `go-kit` has a `Patch` method built-in 
+This is when we store a version number in the projection, and then we only update the projection in dynamo if the version is older than our current version. This won't stop us losing data, but it will stop us overwriting newer data with older data.
+
+There is good write-up in [go-kit](https://github.com/flypay/go-kit/blob/master/docs/resources/README.md#sequencing).
+
+**Patch**
+
+This is a way to get dynamo to update a projection on their end. This is the same as an `UPDATE` statement in SQL. Dynamo will handle the locking around the data, and there should be no concern about data races.
+
+## Avoiding concurrency issues in HTTP and Event Handlers
+
+By default, both our HTTP and Event Handlers will have timeouts. HTTP timeout is 5s, and Event Handlers is 30s (this can be increased via `service.json` if required).
+
+In some cases, we may need to kick off a long-running task to avoid hitting the timeouts.
+
+## Approach 1:
+
+One approach is to kick-off a goroutine to run in the background and handle the task:
+
+.code example11.go /START OMIT/,/END OMIT/
+
+This approach has a few issues:
+
+1. If the pod is restarted, we lose any progress and won't get retried
+2. We will have "rogue" goroutines running in a pod, consuming resources, with no way to stop them or be aware they exist
+3. We could spawn hundreds and thousands goroutines without knowing
+
+## Approach 2:
+
+Raise another event:
+
+.code example12.go /START OMIT/,/END OMIT/
+
+This overcomes the previous issues:
+
+1. Events will be retried if error occurs or the pod restarts
+2. We have good metrics and monitoring set up for events
+3. We can control resources better
+3. Can be scaled much easier by our Platform
+
+## Final Thoughts
+
+As you can see, the stem of most concurrency bugs is the same:
+
+1. Read into memory
+2. Update in memory
+3. Write updated data
+
+This applies to threads, processes, pods. Unfortunately there is no silver-bullet to dealing with race conditions like this, but it is good to be aware why they exist.
+
+Go provides some really nice and useful concurrency features, but they should be used carefully especially when running in production.
+
+In Production it is much easier to monitor and scale events and pods than it is to monitor and scale Goroutines.
