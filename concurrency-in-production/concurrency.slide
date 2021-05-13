@@ -1,0 +1,183 @@
+Concurrency with Go in Production
+
+Jonathan Pentecost
+
+* Simple example
+
+.code example1.c
+
+	$ gcc -o example1-c example1.c -Wall
+	$ ./example1-c
+	main: counter=0
+	main: counter=1
+
+* Crux of the problem: Part 1
+
+What happens when we compile this down to assumbly?
+
+	$ objdump -D example1-c -x86-asm-syntax intel
+
+	0000000100000f10 _inc:
+	100000f10: 55                          	push	rbp
+	100000f11: 48 89 e5                    	mov	rbp, rsp
+	100000f14: 8b 05 f6 10 00 00           	mov	eax, dword ptr [rip + 4342]
+	100000f1a: 83 c0 01                    	add	eax, 1
+	100000f1d: 89 05 ed 10 00 00           	mov	dword ptr [rip + 4333], eax
+	100000f23: 5d                          	pop	rbp
+	100000f24: c3                          	ret
+	100000f25: 66 2e 0f 1f 84 00 00 00 00 00       	nop	word ptr cs:[rax + rax]
+	100000f2f: 90                          	nop
+
+* Crux of the problem: Part 1
+
+As we see the following single line of code:
+
+	counter = counter + 1 
+
+gets compiled down to three instructions:
+
+	100000f14: 8b 05 f6 10 00 00           	mov	eax, dword ptr [rip + 4342]
+	100000f1a: 83 c0 01                    	add	eax, 1
+	100000f1d: 89 05 ed 10 00 00           	mov	dword ptr [rip + 4333], eax
+
+* Now to Go
+
+Lets recreate this example but in Go so we can all understand
+
+.play example1.go
+
+
+* Now lets add some concurrency
+
+.play example2.go
+
+* Why didn't it work
+
+- Go starts up the main function
+- The main function calls a goroutine
+- The Goroutine gets added to the Go runtime scheduler
+- Main functions exits
+
+In this situation, the main function doesn't know that it needs to wait for the runtime scheduler to finish, so it exits.
+
+Quick fix, lets add a `time.Sleep`
+
+* time.Sleep to the rescue
+
+.play example3.go /START OMIT/,/END OMIT/
+
+* Why did this fix the issue
+
+- Go starts up the main function
+- The main function calls a goroutine
+- The Goroutine gets added to the Go runtime scheduler
+- The main function sleeps for some time
+- The Go runtime scheduler gets a chance to execute the goroutine
+- Main functions exits
+
+This fixed this issue, but using a time.Sleep isn't very reliable.
+
+* sync.WaitGroup to the rescue
+
+.play example4.go /START OMIT/,/END OMIT/
+
+* What is sync.WaitGroup
+
+A WaitGroup waits for a collection of goroutines to finish. 
+
+The main goroutine calls Add to set the number of goroutines to wait for. Then each of the goroutines runs and calls Done when finished. 
+
+At the same time, Wait can be used to block until all goroutines have finished.
+
+* Lets add in some concurrency
+
+.play example5.go /START OMIT/,/END OMIT/
+
+* Crux of the problem: Part 1
+
+Remember, the following line:
+
+	counter = counter + 1 
+
+gets compiled down to three instructions and assume that memory location `12345` contains our counter variable:
+
+	mov	eax, 12345
+	add	eax, 1
+	mov	12345, eax
+
+* Crux of the problem: Part 2
+
+How an Operating System schedules threads?
+
+- A thread will run code given to it by the OS
+- Threads share memory
+
+.code os_scheduling.txt
+
+* Crux of the problem: Part 4
+
+In Go we don't control what threads our code is running on, but the Go Runtime Scheduler will utilise threads under-the-hood to manage and run our goroutines.
+
+The same issues we have with threads are the same issues we have with goroutines.
+
+This isn't exactly how it works, but it is a useful way to think about it at a high-level.
+
+.code go_scheduling.txt
+
+* Revisiting the issue
+
+.play example5.go /START OMIT/,/END OMIT/
+
+* Let's add locking
+
+.play example6.go /START OMIT/,/END OMIT/
+
+* Visualizing locking
+
+.code go_scheduling_lock.txt
+
+* Other Go concurrency primitives: Channels
+
+Channels are the pipes that connect concurrent goroutines. 
+
+You can send values into channels from one goroutine and receive those values into another goroutine.
+
+* Buffered Channels: Part 1
+
+.play -edit example7.go
+
+* Buffered Channels: Part 2
+
+.play -edit example8.go
+
+* Unbuffered Channels
+
+.play -edit example9.go
+
+* Concurrency in Distributed System
+
+This is some code taken from one of our services (ordering-api). Does this pattern look familiar?
+
+- Read data from dynamo
+- Update data in memoru
+- Write data to dynamo
+
+.code example10.go /START OMIT/,/END OMIT/
+
+* Scheduling in a Distributed System
+
+This should look very similar to how threads and goroutines get scheduled.
+
+With the way Kubernetes works, a pod is actually a thread being run by the operating system on the host, so the exact same concurrency issues will also occur.
+
+If we aren't careful, multiple running pods updating data in this way will cause concurrency issues.
+
+.code pod_scheduling.txt
+
+* Avoiding concurrency bugs in distributed systems
+
+There is two ways to avoid the concurrency bug:
+
+1. Sequencing: `go-kit` has sequencing built in to our projections. Projections with a sequencing tag will error if you try and update the projection with a previous version
+
+2. Using `Patch`: `go-kit` has a `Patch` method built-in 

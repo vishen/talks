@@ -1,0 +1,15 @@
+OS          		| Pod 1           		| Pod 2
+                     read from dynamo
+                     update data in memory
+interrupt:
+save P1's state
+restore P2's state
+                                             read data from dynamo
+                                             update data in memory
+                                             save data in dynamo
+interrupt:
+save P2's state
+restore P1's state
+                    
+                     save data in dynamo
+

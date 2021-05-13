@@ -1,0 +1,15 @@
+OS                  | Thread 1              | Thread 2
+                     mov   eax, 12345
+                     add   eax, 1
+interrupt:
+save T1's state
+restore T2's state
+                                             mov   eax, 12345
+                                             add   eax, 1
+                                             mov   12345, eax
+interrupt:
+save T2's state
+restore T1's state
+                    
+                     mov 12345, eax
+
